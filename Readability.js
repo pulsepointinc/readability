@@ -1359,13 +1359,21 @@ Readability.prototype = {
    * @return string
   **/
   _getInnerText: function(e, normalizeSpaces) {
-    normalizeSpaces = (typeof normalizeSpaces === "undefined") ? true : normalizeSpaces;
-    var textContent = e.textContent.trim();
+      try {
+          normalizeSpaces = (typeof normalizeSpaces === "undefined") ? true : normalizeSpaces;
+          if(e.textContent == null) {
+              return "";
+          }
 
-    if (normalizeSpaces) {
-      return textContent.replace(this.REGEXPS.normalize, " ");
-    }
-    return textContent;
+          var textContent = e.textContent.trim();
+
+          if (normalizeSpaces) {
+              return textContent.replace(this.REGEXPS.normalize, " ");
+          }
+          return textContent;
+      } catch (e) {
+          return "";
+      }
   },
 
   /**
@@ -1767,12 +1775,23 @@ Readability.prototype = {
       }
     }
 
+    var innerTextAsArray = articleContent.innerText.split('\n');
+    var innerTextAsArrayResult = [""];
+    var x = 0;
+    for (var i = 0; i < innerTextAsArray.length; i++) {
+        if (innerTextAsArray[i].trim() != "") {
+            innerTextAsArrayResult[x] = innerTextAsArray[i];
+            x++;
+        }
+    }
+
     var textContent = articleContent.textContent;
     return {
       title: this._articleTitle,
       byline: metadata.byline || this._articleByline,
       dir: this._articleDir,
       content: articleContent.innerHTML,
+      plainText: innerTextAsArrayResult.join('\n'),
       textContent: textContent,
       length: textContent.length,
       excerpt: metadata.excerpt,
