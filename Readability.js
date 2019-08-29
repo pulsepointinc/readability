@@ -1794,7 +1794,9 @@ Readability.prototype = {
   },
 
   _isProbablyVisible: function(node) {
-    return (!node.style || node.style.display != "none") && !node.hasAttribute("hidden");
+    return (!node.style || node.style.display != "none")
+      && !node.hasAttribute("hidden")
+      && (!node.hasAttribute("aria-hidden") || node.getAttribute("aria-hidden") != "true");
   },
 
   /**
