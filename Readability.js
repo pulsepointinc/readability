@@ -1791,7 +1791,7 @@ Readability.prototype = {
       byline: metadata.byline || this._articleByline,
       dir: this._articleDir,
       content: articleContent.innerHTML,
-      paragraphs: Array.prototype.slice.call(articleContent.getElementsByTagName('p')).map((el) => el.innerText).filter((t) => t.length > 0),
+      paragraphs: Array.prototype.slice.call(articleContent.getElementsByTagName('p')).map((el) => el.innerText).map((text) => text.trim()).filter((t) => t.length > 0),
       plainText: innerTextAsArrayResult.join('\n'),
       textContent: textContent,
       length: textContent.length,
