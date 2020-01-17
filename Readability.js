@@ -1807,8 +1807,7 @@ Readability.prototype = {
    * @private
    */
   _appendSpacesIfRequired: function (node) {
-    
-    if (!node.firstChild) {
+    if (node.childNodes.length == 0) {
       if (this._getInnerText(node, false).length > 0) {
         node.innerText = node.innerText + '&nbsp;';
       }
