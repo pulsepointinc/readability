@@ -80,7 +80,7 @@ function Readability(doc, options) {
         dump("Reader: (Readability) " + msg + "\n");
       } else if (typeof console !== "undefined") {
         var args = ["Reader: (Readability) "].concat(arguments);
-        console.log.apply(console, args);
+        console.log(JSON.stringify(args));
       }
     };
   } else {
@@ -799,7 +799,7 @@ Readability.prototype = {
         var matchString = node.className + " " + node.id;
 
         if (!this._isProbablyVisible(node)) {
-          this.log("Removing hidden node - " + matchString);
+          this.log("Removing hidden node - ",  matchString);
           node = this._removeAndGetNext(node);
           continue;
         }
@@ -817,7 +817,7 @@ Readability.prototype = {
               !this._hasAncestorTag(node, "table") &&
               node.tagName !== "BODY" &&
               node.tagName !== "A") {
-            this.log("Removing unlikely candidate - " + matchString);
+            this.log("Removing unlikely candidate - ", matchString);
             node = this._removeAndGetNext(node);
             continue;
           }
@@ -945,7 +945,7 @@ Readability.prototype = {
         var candidateScore = candidate.readability.contentScore * (1 - this._getLinkDensity(candidate));
         candidate.readability.contentScore = candidateScore;
 
-        this.log("Candidate:", candidate, "with score " + candidateScore);
+        this.log("Candidate:", candidate, "with score ", candidateScore);
 
         for (var t = 0; t < this._nbTopCandidates; t++) {
           var aTopCandidate = topCandidates[t];
@@ -1103,7 +1103,7 @@ Readability.prototype = {
 
             sibling = this._setNodeTag(sibling, "DIV");
           }
-
+          
           articleContent.appendChild(sibling);
           // siblings is a reference to the children array, and
           // sibling is removed from the array when we call appendChild().
@@ -1115,11 +1115,11 @@ Readability.prototype = {
       }
 
       if (this._debug)
-        this.log("Article content pre-prep: " + articleContent.innerHTML);
+        this.log("Article content pre-prep: ", articleContent.innerHTML);
       // So we have all of the content that we need. Now we clean it up for presentation.
       this._prepArticle(articleContent);
       if (this._debug)
-        this.log("Article content post-prep: " + articleContent.innerHTML);
+        this.log("Article content post-prep: ", articleContent.innerHTML);
 
       if (neededToCreateTopCandidate) {
         // We already created a fake div thing, and there wouldn't have been any siblings left
@@ -1140,7 +1140,7 @@ Readability.prototype = {
       }
 
       if (this._debug)
-        this.log("Article content after paging: " + articleContent.innerHTML);
+        this.log("Article content after paging: ", articleContent.innerHTML);
 
       var parseSuccessful = true;
 
@@ -1800,6 +1800,28 @@ Readability.prototype = {
   },
 
   /**
+   * To prevent innerText/textContent combine text from sibling tags without spaces, let's
+   * append &nbsp; to all childless nodes if they contain any text.
+   * 
+   * @param node root node
+   * @private
+   */
+  _appendSpacesIfRequired: function (node) {
+    
+    if (!node.firstChild) {
+      if (this._getInnerText(node, false).length > 0) {
+        node.innerText = node.innerText + '&nbsp;';
+      }
+    }
+    
+    node = node.firstChild;
+    while (node) {
+      this._appendSpacesIfRequired(node);
+      node = node.nextSibling;
+    }
+  },
+
+  /**
    * Runs readability.
    *
    * Workflow:
@@ -1832,7 +1854,9 @@ Readability.prototype = {
     if (!articleContent)
       return null;
 
-    this.log("Grabbed: " + articleContent.innerHTML);
+    this.log("Grabbed: ", articleContent.innerHTML);
+    this._appendSpacesIfRequired(articleContent);
+    this.log("Appended spaces: ", articleContent.innerHTML);
 
     this._postProcessContent(articleContent);
 
@@ -1846,7 +1870,8 @@ Readability.prototype = {
       }
     }
 
-    var innerTextAsArray = articleContent.innerText.split('\n');
+    var articleTextContent = articleContent.textContent;
+    var innerTextAsArray = articleTextContent.split('\n');
     var innerTextAsArrayResult = [""];
     var x = 0;
     for (var i = 0; i < innerTextAsArray.length; i++) {
@@ -1856,7 +1881,7 @@ Readability.prototype = {
         }
     }
 
-    var textContent = articleContent.textContent;
+    var textContent = articleTextContent;
     return {
       title: this._articleTitle,
       byline: metadata.byline || this._articleByline,
