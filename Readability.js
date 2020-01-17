@@ -1846,7 +1846,7 @@ Readability.prototype = {
       }
     }
 
-    var innerTextAsArray = articleContent.innerText.split('\n');
+    var innerTextAsArray = articleContent.textContent.split('\n');
     var innerTextAsArrayResult = [""];
     var x = 0;
     for (var i = 0; i < innerTextAsArray.length; i++) {
