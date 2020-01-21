@@ -784,6 +784,19 @@ Readability.prototype = {
       return null;
     }
 
+    //store hidden nodes to collection, and remove later to prevent removal of CSS nodes which leads to visibility changes
+    var toRemove = [];
+    var allTags = document.getElementsByTagName("*");
+    for (var i = 0; i < allTags.length; i++) {
+      var node = allTags[i];
+      if (!this._isProbablyVisible(node)) {
+        this.log("Removing hidden node - ", node.tagName, node.className);
+        toRemove.push(node);
+      }
+    }
+
+    this._removeNodes(toRemove);
+
     var pageCacheHtml = page.innerHTML;
 
     while (true) {
@@ -798,12 +811,6 @@ Readability.prototype = {
       while (node) {
         var matchString = node.className + " " + node.id;
 
-        if (!this._isProbablyVisible(node)) {
-          this.log("Removing hidden node - ",  matchString);
-          node = this._removeAndGetNext(node);
-          continue;
-        }
-
         // Check to see if this node is a byline, and remove it if it is.
         if (this._checkByline(node, matchString)) {
           node = this._removeAndGetNext(node);
@@ -817,7 +824,7 @@ Readability.prototype = {
               !this._hasAncestorTag(node, "table") &&
               node.tagName !== "BODY" &&
               node.tagName !== "A") {
-            this.log("Removing unlikely candidate - ", matchString);
+            this.log("Removing unlikely candidate - ", node.tagName, matchString);
             node = this._removeAndGetNext(node);
             continue;
           }
@@ -1794,8 +1801,17 @@ Readability.prototype = {
   },
 
   _isProbablyVisible: function(node) {
-    return (!node.style || node.style.display != "none")
-      && !node.hasAttribute("hidden")
+    if (!(!node.style || node.style.display != "none")) {
+      return false;
+    }
+
+    const style = getComputedStyle(node, null);
+    if(!(style && style.display !== 'none' &&
+        style.visibility !== 'hidden' && style.opacity !== '0')) {
+      return false;
+    }
+    
+    return !node.hasAttribute("hidden")
       && (!node.hasAttribute("aria-hidden") || node.getAttribute("aria-hidden") != "true");
   },
 
@@ -1807,12 +1823,14 @@ Readability.prototype = {
    * @private
    */
   _appendSpacesIfRequired: function (node) {
-    if (node.childNodes.length == 0) {
-      if (this._getInnerText(node, false).length > 0) {
-        node.innerText = node.innerText + '&nbsp;';
+    if (node.childNodes.length > 0
+        && Array.prototype.slice.call(node.childNodes).filter(n => n.nodeType === Node.ELEMENT_NODE).length == 0) {
+      var nodeInnerText = this._getInnerText(node, false);
+      if (nodeInnerText.length > 0) {
+        node.innerText = node.innerText + ' ';
       }
     }
-    
+
     node = node.firstChild;
     while (node) {
       this._appendSpacesIfRequired(node);
