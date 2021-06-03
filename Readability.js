@@ -368,6 +368,10 @@ Readability.prototype = {
       // If they had an element with id "title" in their HTML
       if (typeof curTitle !== "string")
         curTitle = origTitle = this._getInnerText(doc.getElementsByTagName("title")[0]);
+      //not sure if the method is useful for us, hence let's skip it at most cases to make result matching de.jetwick.snacktory lib
+      if (curTitle.length > 3) {
+        return curTitle;
+      }
     } catch (e) {/* ignore exceptions setting the title. */}
 
     var titleHadHierarchicalSeparators = false;
