@@ -467,6 +467,11 @@ Readability.prototype = {
       // If they had an element with id "title" in their HTML
       if (typeof curTitle !== "string")
         curTitle = origTitle = this._getInnerText(doc.getElementsByTagName("title")[0]);
+
+      //not sure if the method is useful for us, hence let's skip it at most cases to make result matching de.jetwick.snacktory lib
+      if (curTitle.length > 3) {
+        return curTitle;
+      }
     } catch (e) {/* ignore exceptions setting the title. */}
 
     var titleHadHierarchicalSeparators = false;
@@ -881,6 +886,19 @@ Readability.prototype = {
       return null;
     }
 
+    //store hidden nodes to collection, and remove later to prevent removal of CSS nodes which leads to visibility changes
+    var toRemove = [];
+    var allTags = document.getElementsByTagName("*");
+    for (var i = 0; i < allTags.length; i++) {
+      var node = allTags[i];
+      if (!this._isProbablyVisible(node)) {
+        this.log("Removing hidden node - ", node.tagName, node.className);
+        toRemove.push(node);
+      }
+    }
+
+    this._removeNodes(toRemove);
+
     var pageCacheHtml = page.innerHTML;
 
     while (true) {
@@ -897,13 +915,7 @@ Readability.prototype = {
 
       while (node) {
         var matchString = node.className + " " + node.id;
-
-        if (!this._isProbablyVisible(node)) {
-          this.log("Removing hidden node - " + matchString);
-          node = this._removeAndGetNext(node);
-          continue;
-        }
-
+        
         // Check to see if this node is a byline, and remove it if it is.
         if (this._checkByline(node, matchString)) {
           node = this._removeAndGetNext(node);
@@ -925,7 +937,7 @@ Readability.prototype = {
               !this._hasAncestorTag(node, "code") &&
               node.tagName !== "BODY" &&
               node.tagName !== "A") {
-            this.log("Removing unlikely candidate - " + matchString);
+            this.log("Removing unlikely candidate - ", node.tagName, matchString);
             node = this._removeAndGetNext(node);
             continue;
           }
@@ -1693,13 +1705,21 @@ Readability.prototype = {
    * @return string
   **/
   _getInnerText: function(e, normalizeSpaces) {
-    normalizeSpaces = (typeof normalizeSpaces === "undefined") ? true : normalizeSpaces;
-    var textContent = e.textContent.trim();
+    try {
+      normalizeSpaces = (typeof normalizeSpaces === "undefined") ? true : normalizeSpaces;
+      if(e.textContent == null) {
+        return "";
+      }
 
-    if (normalizeSpaces) {
-      return textContent.replace(this.REGEXPS.normalize, " ");
+      var textContent = e.textContent.trim();
+
+      if (normalizeSpaces) {
+        return textContent.replace(this.REGEXPS.normalize, " ");
+      }
+      return textContent;
+    } catch (e) {
+      return "";
     }
-    return textContent;
   },
 
   /**
@@ -2182,13 +2202,46 @@ Readability.prototype = {
   },
 
   _isProbablyVisible: function(node) {
+    if (!(!node.style || node.style.display != "none")) {
+      return false;
+    }
+
+    const style = getComputedStyle(node, null);
+    if(!(style && style.display !== 'none' &&
+        style.visibility !== 'hidden' && style.opacity !== '0')) {
+      return false;
+    }
+
     // Have to null-check node.style and node.className.indexOf to deal with SVG and MathML nodes.
     return (!node.style || node.style.display != "none")
-      && !node.hasAttribute("hidden")
-      //check for "fallback-image" so that wikimedia math images are displayed
-      && (!node.hasAttribute("aria-hidden") || node.getAttribute("aria-hidden") != "true" || (node.className && node.className.indexOf && node.className.indexOf("fallback-image") !== -1));
+        && !node.hasAttribute("hidden")
+        //check for "fallback-image" so that wikimedia math images are displayed
+        && (!node.hasAttribute("aria-hidden") || node.getAttribute("aria-hidden") != "true" || (node.className && node.className.indexOf && node.className.indexOf("fallback-image") !== -1));
   },
 
+  /**
+   * To prevent innerText/textContent combine text from sibling tags without spaces, let's
+   * append &nbsp; to all childless nodes if they contain any text.
+   *
+   * @param node root node
+   * @private
+   */
+  _appendSpacesIfRequired: function (node) {
+    if (node.childNodes.length > 0
+        && Array.prototype.slice.call(node.childNodes).filter(n => n.nodeType === Node.ELEMENT_NODE).length == 0) {
+      var nodeInnerText = this._getInnerText(node, false);
+      if (nodeInnerText.length > 0) {
+        node.innerText = node.innerText + ' ';
+      }
+    }
+
+    node = node.firstChild;
+    while (node) {
+      this._appendSpacesIfRequired(node);
+      node = node.nextSibling;
+    }
+  },
+  
   /**
    * Runs readability.
    *
@@ -2228,7 +2281,9 @@ Readability.prototype = {
     if (!articleContent)
       return null;
 
-    this.log("Grabbed: " + articleContent.innerHTML);
+    this.log("Grabbed: ", articleContent.innerHTML);
+    this._appendSpacesIfRequired(articleContent);
+    this.log("Appended spaces: ", articleContent.innerHTML);
 
     this._postProcessContent(articleContent);
 
@@ -2242,12 +2297,25 @@ Readability.prototype = {
       }
     }
 
-    var textContent = articleContent.textContent;
+    var articleTextContent = articleContent.textContent;
+    var innerTextAsArray = articleTextContent.split('\n');
+    var innerTextAsArrayResult = [""];
+    var x = 0;
+    for (var i = 0; i < innerTextAsArray.length; i++) {
+      if (innerTextAsArray[i].trim() != "") {
+        innerTextAsArrayResult[x] = innerTextAsArray[i];
+        x++;
+      }
+    }
+
+    var textContent = articleTextContent;
     return {
       title: this._articleTitle,
       byline: metadata.byline || this._articleByline,
       dir: this._articleDir,
       content: this._serializer(articleContent),
+      paragraphs: Array.prototype.slice.call(articleContent.getElementsByTagName('p')).map((el) => el.innerText).map((text) => text.trim()).filter((t) => t.length > 0),
+      plainText: innerTextAsArrayResult.join('\n'),
       textContent: textContent,
       length: textContent.length,
       excerpt: metadata.excerpt,
